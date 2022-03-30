@@ -3,22 +3,20 @@ use cosmwasm_std::entry_point;
 
 use crate::deposit::{deposit_stable, redeem_stable};
 use crate::error::ContractError;
+use crate::helpers::get_decimals;
 use crate::response::MsgInstantiateContractResponse;
-use crate::state::{read_config, store_config, Config, ConfigResponse};
+use crate::state::{
+    read_config, read_deposit_info, read_state, store_config, store_state, Config, ConfigResponse,
+    DepositInfo, InstantiateMsg, QueryMsg, State,
+};
 
-use cosmwasm_bignumber::{Decimal256, Uint256};
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps,
-    DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    attr, from_binary, to_binary, Addr, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
 };
 use cw20::{Cw20Coin, Cw20ReceiveMsg, MinterResponse};
 
-use moneymarket::common::optional_addr_validate;
-use moneymarket::interest_model::BorrowRateResponse;
-use moneymarket::market::{
-    Cw20HookMsg, EpochStateResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse,
-};
-use moneymarket::querier::{deduct_tax, query_balance, query_supply};
+use moneymarket::market::{Cw20HookMsg, ExecuteMsg};
 use protobuf::Message;
 use terraswap::token::InstantiateMsg as TokenInstantiateMsg;
 
@@ -51,6 +49,14 @@ pub fn instantiate(
             contract_addr: deps.api.addr_canonicalize(env.contract.address.as_str())?,
             aterra_contract: CanonicalAddr::from(vec![]),
             stable_denom: msg.stable_denom.clone(),
+            interest_rate: get_decimals(msg.interest)?,
+        },
+    )?;
+
+    store_state(
+        deps.storage,
+        &State {
+            accrued_interest_payments: Uint128::zero(),
         },
     )?;
 
@@ -62,7 +68,7 @@ pub fn instantiate(
                 funds: vec![],
                 label: "".to_string(),
                 msg: to_binary(&TokenInstantiateMsg {
-                    name: format!("Anchor Terra {}", msg.stable_denom[1..].to_uppercase()),
+                    name: format!("yxz {}", msg.stable_denom[1..].to_uppercase()),
                     symbol: format!(
                         "a{}T",
                         msg.stable_denom[1..(msg.stable_denom.len() - 1)].to_uppercase()
@@ -94,31 +100,34 @@ pub fn execute(
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::DepositStable {} => deposit_stable(deps, env, info),
         ExecuteMsg::RegisterContracts {
-            overseer_contract,
-            interest_model,
-            distribution_model,
-            collector_contract,
-            distributor_contract,
+            overseer_contract: _,
+            interest_model: _,
+            distribution_model: _,
+            collector_contract: _,
+            distributor_contract: _,
         } => Ok(Response::default()),
         ExecuteMsg::UpdateConfig {
-            owner_addr,
-            interest_model,
-            distribution_model,
-            max_borrow_factor,
+            owner_addr: _,
+            interest_model: _,
+            distribution_model: _,
+            max_borrow_factor: _,
         } => Ok(Response::default()),
         ExecuteMsg::ExecuteEpochOperations {
-            deposit_rate,
-            target_deposit_rate,
-            threshold_deposit_rate,
-            distributed_interest,
+            deposit_rate: _,
+            target_deposit_rate: _,
+            threshold_deposit_rate: _,
+            distributed_interest: _,
         } => Ok(Response::default()),
-        ExecuteMsg::BorrowStable { borrow_amount, to } => Ok(Response::default()),
+        ExecuteMsg::BorrowStable {
+            borrow_amount: _,
+            to: _,
+        } => Ok(Response::default()),
         ExecuteMsg::RepayStable {} => Ok(Response::default()),
         ExecuteMsg::RepayStableFromLiquidation {
-            borrower,
-            prev_balance,
+            borrower: _,
+            prev_balance: _,
         } => Ok(Response::default()),
-        ExecuteMsg::ClaimRewards { to } => Ok(Response::default()),
+        ExecuteMsg::ClaimRewards { to: _ } => Ok(Response::default()),
     }
 }
 
@@ -182,16 +191,8 @@ pub fn register_aterra(deps: DepsMut, token_addr: Addr) -> Result<Response, Cont
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::State { block_height } => to_binary(&()),
-        QueryMsg::EpochState {
-            block_height,
-            distributed_interest,
-        } => to_binary(&()),
-        QueryMsg::BorrowerInfo {
-            borrower,
-            block_height,
-        } => to_binary(&()),
-        QueryMsg::BorrowerInfos { start_after, limit } => to_binary(&()),
+        QueryMsg::State {} => to_binary(&query_state(deps)?),
+        QueryMsg::Ident { address } => to_binary(&query_ident(deps, address)?),
     }
 }
 
@@ -200,5 +201,16 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         aterra_contract: deps.api.addr_humanize(&config.aterra_contract)?.to_string(),
         stable_denom: config.stable_denom,
+        interest_rate: config.interest_rate,
     })
+}
+
+pub fn query_state(deps: Deps) -> StdResult<State> {
+    let state = read_state(deps.storage)?;
+    Ok(state.clone())
+}
+
+pub fn query_ident(deps: Deps, ident: String) -> StdResult<DepositInfo> {
+    let state = read_deposit_info(deps.storage, &deps.api.addr_canonicalize(&ident)?);
+    Ok(state.clone())
 }

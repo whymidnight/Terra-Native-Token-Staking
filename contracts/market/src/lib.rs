@@ -3,6 +3,7 @@ pub mod contract;
 pub mod deposit;
 pub mod error;
 // pub mod querier;
+pub mod helpers;
 pub mod response;
 pub mod state;
 

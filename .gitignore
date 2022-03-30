@@ -1,1 +1,4 @@
 contracts/market/target/**
+packages/moneymarket/target/
+packages/moneymarket/Cargo.lock
+.mypy_cache
