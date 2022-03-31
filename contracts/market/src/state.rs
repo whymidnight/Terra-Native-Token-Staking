@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128};
 use cosmwasm_storage::{bucket, bucket_read, ReadonlySingleton, Singleton};
+use cw20::Cw20ReceiveMsg;
 
 pub const KEY_CONFIG: &[u8] = b"config";
 pub const KEY_STATE: &[u8] = b"state";
@@ -40,9 +41,9 @@ pub fn read_config(storage: &dyn Storage) -> StdResult<Config> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct DepositInfo {
-    pub balance: Uint128,
     pub interested_balance: Uint128,
     pub last_interaction: u64,
+    pub last_balance: Uint128,
     pub initial_interaction: u64,
 }
 
@@ -58,9 +59,9 @@ pub fn read_deposit_info(storage: &dyn Storage, ident: &CanonicalAddr) -> Deposi
     match bucket_read(storage, DEPOSITS).load(ident.as_slice()) {
         Ok(v) => v,
         _ => DepositInfo {
-            balance: Uint128::zero(),
             interested_balance: Uint128::zero(),
             last_interaction: 0,
+            last_balance: Uint128::zero(),
             initial_interaction: 0,
         },
     }
@@ -85,4 +86,22 @@ pub enum QueryMsg {
     Config {},
     State {},
     Ident { address: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Cw20HookMsg {
+    /// Return stable coins to a user
+    /// according to exchange rate
+    RedeemNStable {},
+    RedeemAllStable {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecuteMsg {
+    Receive(Cw20ReceiveMsg),
+
+    DepositStable {},
+    ClaimRewards { to: Option<String> },
 }

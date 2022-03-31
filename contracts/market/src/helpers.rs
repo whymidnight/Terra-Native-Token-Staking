@@ -2,20 +2,27 @@ use crate::state::{Config, DepositInfo};
 use cosmwasm_std::{Decimal, StdError, StdResult, Uint128};
 use std::str::FromStr;
 
-// https://gist.github.com/whymidnight/ed98dd59a73036038785e899be8c3ba9
+/*
+    let updatedTotal = userTotal
+    for each day in daysSinceLastInteraction{
+        updatedTotal += ( updatedTotal * InterestRate )
+    }
+
+    InterestDifferenceAmount = ( updatedtotal - userTotal )
+    atokenMintAmt = (interestDifferenceAmount + Deposit)
+    MintAtokens(atokenMintAmt)
+    userTotal = updatedTotal
+*/
 pub fn calculate_accrued_interest(
     config: &Config,
     deposit: &DepositInfo,
     days: u64,
 ) -> StdResult<Uint128> {
-    let mut compounded_yield = Uint128::zero();
+    let mut interested_balance = deposit.last_balance.clone();
     for _day in 0..days {
-        // += (1.000 * 0.145) + 1
-        // += (1.145 * 0.145) + 1
-        // += (2.311 * 0.145) + 1
-        compounded_yield += deposit.balance.clone() * config.interest_rate;
+        interested_balance += interested_balance.clone() * config.interest_rate;
     }
-    Ok(compounded_yield)
+    Ok(interested_balance.clone() - deposit.last_balance.clone())
 }
 
 pub fn get_decimals(value: String) -> StdResult<Decimal> {
@@ -29,4 +36,3 @@ pub fn get_decimals(value: String) -> StdResult<Decimal> {
         _ => Err(StdError::generic_err("Unexpected number of dots")),
     }
 }
-

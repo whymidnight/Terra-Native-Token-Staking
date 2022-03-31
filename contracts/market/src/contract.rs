@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 
-use crate::deposit::{deposit_stable, redeem_stable};
+use crate::deposit::{deposit_stable, redeem_all_stable, redeem_n_stable};
 use crate::error::ContractError;
 use crate::helpers::get_decimals;
 use crate::response::MsgInstantiateContractResponse;
@@ -16,7 +16,7 @@ use cosmwasm_std::{
 };
 use cw20::{Cw20Coin, Cw20ReceiveMsg, MinterResponse};
 
-use moneymarket::market::{Cw20HookMsg, ExecuteMsg};
+use crate::state::{Cw20HookMsg, ExecuteMsg};
 use protobuf::Message;
 use terraswap::token::InstantiateMsg as TokenInstantiateMsg;
 
@@ -99,34 +99,6 @@ pub fn execute(
     match msg {
         ExecuteMsg::Receive(msg) => receive_cw20(deps, env, info, msg),
         ExecuteMsg::DepositStable {} => deposit_stable(deps, env, info),
-        ExecuteMsg::RegisterContracts {
-            overseer_contract: _,
-            interest_model: _,
-            distribution_model: _,
-            collector_contract: _,
-            distributor_contract: _,
-        } => Ok(Response::default()),
-        ExecuteMsg::UpdateConfig {
-            owner_addr: _,
-            interest_model: _,
-            distribution_model: _,
-            max_borrow_factor: _,
-        } => Ok(Response::default()),
-        ExecuteMsg::ExecuteEpochOperations {
-            deposit_rate: _,
-            target_deposit_rate: _,
-            threshold_deposit_rate: _,
-            distributed_interest: _,
-        } => Ok(Response::default()),
-        ExecuteMsg::BorrowStable {
-            borrow_amount: _,
-            to: _,
-        } => Ok(Response::default()),
-        ExecuteMsg::RepayStable {} => Ok(Response::default()),
-        ExecuteMsg::RepayStableFromLiquidation {
-            borrower: _,
-            prev_balance: _,
-        } => Ok(Response::default()),
         ExecuteMsg::ClaimRewards { to: _ } => Ok(Response::default()),
     }
 }
@@ -161,15 +133,23 @@ pub fn receive_cw20(
 ) -> Result<Response, ContractError> {
     let contract_addr = info.sender;
     match from_binary(&cw20_msg.msg) {
-        Ok(Cw20HookMsg::RedeemStable {}) => {
-            // only asset contract can execute this message
+        Ok(Cw20HookMsg::RedeemNStable {}) => {
             let config: Config = read_config(deps.storage)?;
             if deps.api.addr_canonicalize(contract_addr.as_str())? != config.aterra_contract {
                 return Err(ContractError::Unauthorized {});
             }
 
             let cw20_sender_addr = deps.api.addr_validate(&cw20_msg.sender)?;
-            redeem_stable(deps, env, cw20_sender_addr, cw20_msg.amount)
+            redeem_n_stable(deps, env, cw20_sender_addr, cw20_msg.amount)
+        }
+        Ok(Cw20HookMsg::RedeemAllStable {}) => {
+            let config: Config = read_config(deps.storage)?;
+            if deps.api.addr_canonicalize(contract_addr.as_str())? != config.aterra_contract {
+                return Err(ContractError::Unauthorized {});
+            }
+
+            let cw20_sender_addr = deps.api.addr_validate(&cw20_msg.sender)?;
+            redeem_all_stable(deps, env, cw20_sender_addr, cw20_msg.amount)
         }
         _ => Err(ContractError::MissingRedeemStableHook {}),
     }
