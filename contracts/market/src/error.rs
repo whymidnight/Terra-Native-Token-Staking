@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Overflow")]
+    Overflow {},
+
     #[error("Borrow amount too high; Loan liability becomes greater than borrow limit: {0}")]
     BorrowExceedsLimit(u128),
 

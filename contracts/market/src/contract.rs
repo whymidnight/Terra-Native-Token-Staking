@@ -3,11 +3,12 @@ use cosmwasm_std::entry_point;
 
 use crate::deposit::{deposit_stable, redeem_all_stable, redeem_n_stable};
 use crate::error::ContractError;
-use crate::helpers::get_decimals;
+use crate::helpers::{calculate_accrued_interest, get_decimals};
 use crate::response::MsgInstantiateContractResponse;
 use crate::state::{
-    read_config, read_deposit_info, read_state, store_config, store_state, Config, ConfigResponse,
-    DepositInfo, InstantiateMsg, QueryMsg, State,
+    read_config, read_deposit_info, read_state, read_tvl_indice, read_tvl_indices, store_config,
+    store_state, store_tvl_indice, Config, ConfigResponse, DepositInfo, InstantiateMsg, QueryMsg,
+    State, Tvl,
 };
 
 use cosmwasm_std::{
@@ -20,6 +21,8 @@ use crate::state::{Cw20HookMsg, ExecuteMsg};
 use protobuf::Message;
 use terraswap::token::InstantiateMsg as TokenInstantiateMsg;
 
+// TODO: CHANGE TO 24 HOURS
+pub const DURATION: u64 = 30;
 pub const INITIAL_DEPOSIT_AMOUNT: u128 = 1000000;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -32,14 +35,14 @@ pub fn instantiate(
     let initial_deposit = info
         .funds
         .iter()
-        .find(|c| c.denom == msg.stable_denom)
+        .find(|c| c.denom == "uusd".to_string())
         .map(|c| c.amount)
         .unwrap_or_else(Uint128::zero);
 
     if initial_deposit != Uint128::from(INITIAL_DEPOSIT_AMOUNT) {
         return Err(ContractError::InitialFundsNotDeposited(
             INITIAL_DEPOSIT_AMOUNT,
-            msg.stable_denom,
+            "uusd".to_string(),
         ));
     }
 
@@ -56,9 +59,21 @@ pub fn instantiate(
     store_state(
         deps.storage,
         &State {
+            tvl: Uint128::zero(),
+            tvl_indices: 0,
             accrued_interest_payments: Uint128::zero(),
         },
     )?;
+
+    let _tvl_store = store_tvl_indice(
+        deps.storage,
+        &mut Tvl {
+            tvl: Uint128::zero(),
+            epoch: 0,
+        },
+        0,
+    )
+    .unwrap();
 
     Ok(
         Response::new().add_submessages(vec![SubMsg::reply_on_success(
@@ -70,7 +85,7 @@ pub fn instantiate(
                 msg: to_binary(&TokenInstantiateMsg {
                     name: format!("yxz {}", msg.stable_denom[1..].to_uppercase()),
                     symbol: format!(
-                        "a{}T",
+                        "xyz{}T",
                         msg.stable_denom[1..(msg.stable_denom.len() - 1)].to_uppercase()
                     ),
                     decimals: 6u8,
@@ -172,7 +187,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::State {} => to_binary(&query_state(deps)?),
-        QueryMsg::Ident { address } => to_binary(&query_ident(deps, address)?),
+        QueryMsg::Ident { address, epoch } => to_binary(&query_ident(deps, address, epoch)?),
+        QueryMsg::Tvl { indice } => to_binary(&query_tvl(deps, indice)?),
     }
 }
 
@@ -190,7 +206,25 @@ pub fn query_state(deps: Deps) -> StdResult<State> {
     Ok(state.clone())
 }
 
-pub fn query_ident(deps: Deps, ident: String) -> StdResult<DepositInfo> {
-    let state = read_deposit_info(deps.storage, &deps.api.addr_canonicalize(&ident)?);
-    Ok(state.clone())
+pub fn query_ident(deps: Deps, ident: String, epoch: u64) -> StdResult<DepositInfo> {
+    let config: Config = read_config(deps.storage)?;
+    let mut depositor = read_deposit_info(deps.storage, &deps.api.addr_canonicalize(&ident)?);
+    if depositor.initial_interaction != 0 && epoch > depositor.last_interaction {
+        let duration = epoch - depositor.last_interaction.clone();
+        let days = duration / (DURATION);
+        let accrued_interest = calculate_accrued_interest(&depositor, config.interest_rate, days)?;
+        depositor.accrued_interest = accrued_interest;
+    }
+    Ok(depositor.clone())
+}
+
+pub fn query_tvl(deps: Deps, indice: i64) -> StdResult<Vec<Tvl>> {
+    let tvls: Vec<Tvl>;
+    if indice == -1 {
+        let state = read_state(deps.storage)?;
+        tvls = read_tvl_indices(deps.storage, state.tvl_indices)?;
+    } else {
+        tvls = vec![read_tvl_indice(deps.storage, indice)];
+    }
+    Ok(tvls.clone())
 }

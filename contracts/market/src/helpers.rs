@@ -1,4 +1,4 @@
-use crate::state::{Config, DepositInfo};
+use crate::state::DepositInfo;
 use cosmwasm_std::{Decimal, StdError, StdResult, Uint128};
 use std::str::FromStr;
 
@@ -14,15 +14,20 @@ use std::str::FromStr;
     userTotal = updatedTotal
 */
 pub fn calculate_accrued_interest(
-    config: &Config,
     deposit: &DepositInfo,
+    interest_rate: Decimal,
     days: u64,
 ) -> StdResult<Uint128> {
-    let mut interested_balance = deposit.last_balance.clone();
-    for _day in 0..days {
-        interested_balance += interested_balance.clone() * config.interest_rate;
+    if days == 0 {
+        return Ok(Uint128::zero());
     }
-    Ok(interested_balance.clone() - deposit.last_balance.clone())
+    let mut interested_balance = deposit.last_balance.clone();
+    let mut counter: u64 = 0;
+    while counter < days {
+        interested_balance += interested_balance * interest_rate;
+        counter += 1;
+    }
+    Ok(interested_balance - deposit.last_balance.clone())
 }
 
 pub fn get_decimals(value: String) -> StdResult<Decimal> {
