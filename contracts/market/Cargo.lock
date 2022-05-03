@@ -402,19 +402,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "efaa7b300f3b5fe8eb6bf21ce3895e1751d9665086af2d64b42f19701015ff4f"
 
 [[package]]
-name = "moneymarket"
-version = "0.3.1"
-dependencies = [
- "cosmwasm-bignumber",
- "cosmwasm-std",
- "cosmwasm-storage",
- "cw20",
- "schemars",
- "serde",
- "terra-cosmwasm",
-]
-
-[[package]]
 name = "moneymarket-market"
 version = "0.0.0"
 dependencies = [
@@ -425,7 +412,6 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw20",
- "moneymarket",
  "protobuf",
  "schemars",
  "serde",

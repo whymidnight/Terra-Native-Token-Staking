@@ -1,14 +1,25 @@
 import asyncio
+import time
 from terra_sdk.client.lcd import AsyncLCDClient
 
 """
+uusd
+```
 contract_address	
-terra1cam4mn8srq2n32f950acpx36v8wq4yhm5tz4v8
+terra1mshd2fy5g9c5zxcg5f7d42pgmwf8rjp3x8cev9
 aterra	
-terra1u6jyrgfvtjdl2kq8l7ktz8a6fgmzjluv34dz0y
+terra1jwtg2p0p9mreu2qlrc6vgzk723gp6n76n4lu3m
+```
+uluna
+```
+contract_address	
+terra18z45ccdqnk5zr72rpqzwszazaglrj2dxymmjmc
+aterra	
+terra1a47lhpxpuxsdtjtpk4p6jul5fr0wh6aa8r246z
+```
 """
-contract_address = "terra1cam4mn8srq2n32f950acpx36v8wq4yhm5tz4v8"
-atoken_address = "terra1u6jyrgfvtjdl2kq8l7ktz8a6fgmzjluv34dz0y"
+contract_address = "terra1gvaqwxtpptuuxuhvxkn5n05e9zvjrgd74serta"
+atoken_address = "terra1jmwart643ta5z64mrrj47tmveud0ar82vd0k7u"
 
 
 async def get_config(terra: AsyncLCDClient):
@@ -29,7 +40,7 @@ async def get_atokens(terra: AsyncLCDClient):
     print(resp)
 
 
-async def get_depositor(terra: AsyncLCDClient):
+async def get_state(terra: AsyncLCDClient):
     resp = await terra.wasm.contract_query(
         contract_address=contract_address,
         query={"state": {}},
@@ -38,22 +49,47 @@ async def get_depositor(terra: AsyncLCDClient):
     print(resp)
 
 
-async def get_state(terra: AsyncLCDClient):
+async def get_depositor(terra: AsyncLCDClient):
     resp = await terra.wasm.contract_query(
         contract_address=contract_address,
-        query={"ident": {"address": "terra1xxxs5jjt666elnezqwyqft0j6ptvaldl6c73dn"}},
+        query={
+            "ident": {
+                "address": "terra1xxxs5jjt666elnezqwyqft0j6ptvaldl6c73dn",
+                "epoch": int(time.time()),
+            }
+        },
     )
 
     print(resp)
 
 
+async def get_tvl(terra: AsyncLCDClient):
+    print("---------")
+    resp = await terra.wasm.contract_query(
+        contract_address=contract_address,
+        query={"tvl": {"indice": -1}},
+    )
+    print(resp)
+    for i in range(0, 6):
+        print("---------")
+        resp = await terra.wasm.contract_query(
+            contract_address=contract_address,
+            query={"tvl": {"indice": i}},
+        )
+
+        print(i, resp)
+    print("---------")
+
+
 async def main():
     terra = AsyncLCDClient("https://bombay-lcd.terra.dev", "bombay-12")
-    await get_config(terra)
+    # await get_config(terra)
     await get_state(terra)
+    await get_tvl(terra)
     await get_depositor(terra)
-    await get_atokens(terra)
+    # await get_atokens(terra)
     await terra.session.close()  # you must close the session
+    print(int(time.time()))
 
 
 if __name__ == "__main__":

@@ -13,6 +13,9 @@ const DEPOSITS: &[u8] = b"deposit";
 const TVLS: &[u8] = b"tvl_history";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct InstantiateMsg {
     pub stable_denom: String,

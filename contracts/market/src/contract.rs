@@ -7,8 +7,8 @@ use crate::helpers::{calculate_accrued_interest, get_decimals};
 use crate::response::MsgInstantiateContractResponse;
 use crate::state::{
     read_config, read_deposit_info, read_state, read_tvl_indice, read_tvl_indices, store_config,
-    store_state, store_tvl_indice, Config, ConfigResponse, DepositInfo, InstantiateMsg, QueryMsg,
-    State, Tvl,
+    store_state, store_tvl_indice, Config, ConfigResponse, DepositInfo, InstantiateMsg, MigrateMsg,
+    QueryMsg, State, Tvl,
 };
 
 use cosmwasm_std::{
@@ -24,6 +24,11 @@ use terraswap::token::InstantiateMsg as TokenInstantiateMsg;
 // TODO: CHANGE TO 24 HOURS
 pub const DURATION: u64 = 30;
 pub const INITIAL_DEPOSIT_AMOUNT: u128 = 1000000;
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+    Ok(Response::default())
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
